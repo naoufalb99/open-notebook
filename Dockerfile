@@ -32,6 +32,10 @@ COPY open_notebook/__init__.py ./open_notebook/__init__.py
 # Install dependencies with optimizations (this layer will be cached unless dependencies change)
 RUN uv sync --frozen --no-dev
 
+# Patch Esperanto to support auth_token (Authorization: Bearer) for Anthropic
+COPY scripts/patch_esperanto_anthropic.py /tmp/patch_esperanto_anthropic.py
+RUN .venv/bin/python /tmp/patch_esperanto_anthropic.py && rm /tmp/patch_esperanto_anthropic.py
+
 # Pre-download tiktoken encoding so the app works offline (issue #264).
 # /app/tiktoken-cache is intentionally outside /app/data/ so that volume mounts
 # of /app/data (for user data persistence) do not hide the pre-baked encoding.
