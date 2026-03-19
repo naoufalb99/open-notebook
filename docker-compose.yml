@@ -6,11 +6,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./surreal_data:/mydata
+      - surrealdb:/mydata
     environment:
       - SURREAL_EXPERIMENTAL_GRAPHQL=true
     restart: always
     pull_policy: always
+    networks:
+      - dokploy-network
 
   open_notebook:
     build:
@@ -19,20 +21,47 @@ services:
     ports:
       - "8502:8502"  # Web UI
       - "5055:5055"  # REST API
+    expose:
+      - 8502
+      - 5055
     environment:
-      # REQUIRED: Change this to your own secret string
-      # This encrypts your API keys in the database
-      - OPEN_NOTEBOOK_ENCRYPTION_KEY=change-me-to-a-secret-string
+      # REQUIRED: Set via .env or secrets
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY}
 
-      # Database connection (default values - no need to change)
+      # Database connection
       - SURREAL_URL=ws://surrealdb:8000/rpc
       - SURREAL_USER=root
       - SURREAL_PASSWORD=root
       - SURREAL_NAMESPACE=open_notebook
       - SURREAL_DATABASE=open_notebook
+
+      - API_URL=https://api.onb.skoris.com
     volumes:
-      - ./notebook_data:/app/data
+      - open_notebook:/app/data
     depends_on:
       - surrealdb
     restart: always
     pull_policy: always
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.open_notebook.rule=Host(`onb.skoris.com`)"
+      - "traefik.http.routers.open_notebook.entrypoints=websecure"
+      - "traefik.http.routers.open_notebook.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.open_notebook.service=open_notebook"
+      - "traefik.http.services.open_notebook.loadbalancer.server.port=8502"
+
+      - "traefik.http.routers.open_notebook_api.rule=Host(`api.onb.skoris.com`)"
+      - "traefik.http.routers.open_notebook_api.entrypoints=websecure"
+      - "traefik.http.routers.open_notebook_api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.open_notebook_api.service=open_notebook_api"
+      - "traefik.http.services.open_notebook_api.loadbalancer.server.port=5055"
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  surrealdb:
+  open_notebook:
