@@ -154,6 +154,7 @@ async def create_credential(request: CreateCredentialRequest):
             provider=request.provider.lower(),
             modalities=request.modalities,
             api_key=SecretStr(request.api_key) if request.api_key else None,
+            auth_token=SecretStr(request.auth_token) if request.auth_token else None,
             base_url=request.base_url,
             endpoint=request.endpoint,
             api_version=request.api_version,
@@ -213,6 +214,8 @@ async def update_credential(credential_id: str, request: UpdateCredentialRequest
             cred.modalities = request.modalities
         if request.api_key is not None:
             cred.api_key = SecretStr(request.api_key)
+        if request.auth_token is not None:
+            cred.auth_token = SecretStr(request.auth_token) if request.auth_token else None
         if request.base_url is not None:
             cred.base_url = request.base_url or None
         if request.endpoint is not None:

@@ -166,10 +166,13 @@ function CredentialFormDialog({
   const isVertex = provider === 'vertex'
   const isOllama = provider === 'ollama'
   const isOpenAICompatible = provider === 'openai_compatible'
+  const supportsAuthToken = provider === 'anthropic'
   const requiresApiKey = !isVertex && !isOllama && !isOpenAICompatible
 
   const [name, setName] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [authToken, setAuthToken] = useState('')
+  const [authMode, setAuthMode] = useState<'api_key' | 'auth_token'>('api_key')
   const [baseUrl, setBaseUrl] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [project, setProject] = useState('')
@@ -183,6 +186,8 @@ function CredentialFormDialog({
       setName(credential.name || '')
       setBaseUrl(credential.base_url || '')
       setApiKey('')
+      setAuthToken('')
+      setAuthMode(credential.has_auth_token ? 'auth_token' : 'api_key')
       setProject(credential.project || '')
       setLocation(credential.location || '')
       setCredentialsPath(credential.credentials_path || '')
@@ -191,6 +196,8 @@ function CredentialFormDialog({
       setName('')
       setBaseUrl('')
       setApiKey('')
+      setAuthToken('')
+      setAuthMode('api_key')
       setProject('')
       setLocation('')
       setCredentialsPath('')
@@ -208,7 +215,11 @@ function CredentialFormDialog({
     if (isEditing && credential) {
       const data: UpdateCredentialRequest = {}
       if (name !== credential.name) data.name = name
-      if (apiKey.trim()) data.api_key = apiKey.trim()
+      if (supportsAuthToken && authMode === 'auth_token') {
+        if (authToken.trim()) data.auth_token = authToken.trim()
+      } else {
+        if (apiKey.trim()) data.api_key = apiKey.trim()
+      }
       if (baseUrl !== (credential.base_url || '')) data.base_url = baseUrl || undefined
       if (JSON.stringify(modalities) !== JSON.stringify(credential.modalities)) data.modalities = modalities
       if (isVertex) {
@@ -222,8 +233,12 @@ function CredentialFormDialog({
         name: name || `${PROVIDER_DISPLAY_NAMES[provider] || provider} Config`,
         provider,
         modalities,
-        api_key: apiKey.trim() || undefined,
         base_url: baseUrl || undefined,
+      }
+      if (supportsAuthToken && authMode === 'auth_token') {
+        data.auth_token = authToken.trim() || undefined
+      } else {
+        data.api_key = apiKey.trim() || undefined
       }
       if (isVertex) {
         data.project = project.trim() || undefined
@@ -234,11 +249,15 @@ function CredentialFormDialog({
     }
   }
 
+  const hasCredentialValue = supportsAuthToken && authMode === 'auth_token'
+    ? authToken.trim() !== ''
+    : apiKey.trim() !== ''
+
   const isValid = isEditing
     ? true
     : isVertex
       ? name.trim() !== '' && project.trim() !== '' && location.trim() !== ''
-      : name.trim() !== '' && (!requiresApiKey || apiKey.trim() !== '')
+      : name.trim() !== '' && (!requiresApiKey || hasCredentialValue)
 
   const docsUrl = PROVIDER_DOCS[provider]
 
@@ -308,39 +327,98 @@ function CredentialFormDialog({
               </div>
             </>
           ) : (
-            /* API Key */
-            <div className="space-y-2">
-              <Label htmlFor="api-key">
-                {t.models.apiKey}
-                {!requiresApiKey && <span className="text-muted-foreground font-normal ml-1">({t.common.optional})</span>}
-              </Label>
-              <div className="relative">
-                <input
-                  id="api-key"
-                  type={showApiKey ? 'text' : 'password'}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pr-10"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={isEditing ? '••••••••••••' : 'sk-...'}
-                  disabled={isSubmitting}
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
-                  tabIndex={-1}
-                >
-                  {showApiKey ? 'Hide' : 'Show'}
-                </button>
-              </div>
-              {isEditing && <p className="text-xs text-muted-foreground">{t.apiKeys.apiKeyEditHint}</p>}
-              {docsUrl && (
-                <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
-                  {t.apiKeys.getApiKey} &rarr;
-                </a>
+            <>
+              {/* Auth mode selector for providers that support Bearer token */}
+              {supportsAuthToken && (
+                <div className="space-y-2">
+                  <Label>{t.apiKeys.authMethod || 'Authentication method'}</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${authMode === 'api_key' ? 'border-primary bg-primary/10 text-primary' : 'border-input text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => setAuthMode('api_key')}
+                      disabled={isSubmitting}
+                    >
+                      API Key (x-api-key)
+                    </button>
+                    <button
+                      type="button"
+                      className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${authMode === 'auth_token' ? 'border-primary bg-primary/10 text-primary' : 'border-input text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => setAuthMode('auth_token')}
+                      disabled={isSubmitting}
+                    >
+                      Bearer Token
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
+
+              {/* API Key or Auth Token input */}
+              {supportsAuthToken && authMode === 'auth_token' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="auth-token">
+                    {t.apiKeys.authToken || 'Auth Token'}
+                  </Label>
+                  <div className="relative">
+                    <input
+                      id="auth-token"
+                      type={showApiKey ? 'text' : 'password'}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pr-10"
+                      value={authToken}
+                      onChange={(e) => setAuthToken(e.target.value)}
+                      placeholder={isEditing ? '••••••••••••' : 'Bearer token...'}
+                      disabled={isSubmitting}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                      tabIndex={-1}
+                    >
+                      {showApiKey ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t.apiKeys.authTokenHint || 'Uses Authorization: Bearer header instead of x-api-key'}
+                  </p>
+                  {isEditing && <p className="text-xs text-muted-foreground">{t.apiKeys.apiKeyEditHint}</p>}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">
+                    {t.models.apiKey}
+                    {!requiresApiKey && <span className="text-muted-foreground font-normal ml-1">({t.common.optional})</span>}
+                  </Label>
+                  <div className="relative">
+                    <input
+                      id="api-key"
+                      type={showApiKey ? 'text' : 'password'}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pr-10"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={isEditing ? '••••••••••••' : 'sk-...'}
+                      disabled={isSubmitting}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                      tabIndex={-1}
+                    >
+                      {showApiKey ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  {isEditing && <p className="text-xs text-muted-foreground">{t.apiKeys.apiKeyEditHint}</p>}
+                  {docsUrl && (
+                    <a href={docsUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                      {t.apiKeys.getApiKey} &rarr;
+                    </a>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {/* Base URL (non-Vertex) */}

@@ -17,6 +17,7 @@ export interface Credential {
   location?: string | null
   credentials_path?: string | null
   has_api_key: boolean
+  has_auth_token: boolean
   created: string
   updated: string
   model_count: number
@@ -27,6 +28,7 @@ export interface CreateCredentialRequest {
   provider: string
   modalities: string[]
   api_key?: string
+  auth_token?: string
   base_url?: string
   endpoint?: string
   api_version?: string
@@ -43,6 +45,7 @@ export interface UpdateCredentialRequest {
   name?: string
   modalities?: string[]
   api_key?: string
+  auth_token?: string
   base_url?: string
   endpoint?: string
   api_version?: string

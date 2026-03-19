@@ -564,6 +564,9 @@ class CreateCredentialRequest(BaseModel):
         description="Supported modalities (language, embedding, text_to_speech, speech_to_text)",
     )
     api_key: Optional[str] = Field(None, description="API key (stored encrypted)")
+    auth_token: Optional[str] = Field(
+        None, description="Auth token for Authorization: Bearer (alternative to api_key)"
+    )
     base_url: Optional[str] = Field(None, description="Base URL")
     endpoint: Optional[str] = Field(None, description="Endpoint URL (Azure)")
     api_version: Optional[str] = Field(None, description="API version (Azure)")
@@ -584,6 +587,9 @@ class UpdateCredentialRequest(BaseModel):
     name: Optional[str] = Field(None, description="Credential name")
     modalities: Optional[List[str]] = Field(None, description="Supported modalities")
     api_key: Optional[str] = Field(None, description="API key (stored encrypted)")
+    auth_token: Optional[str] = Field(
+        None, description="Auth token for Authorization: Bearer (alternative to api_key)"
+    )
     base_url: Optional[str] = Field(None, description="Base URL")
     endpoint: Optional[str] = Field(None, description="Endpoint URL")
     api_version: Optional[str] = Field(None, description="API version")
@@ -614,6 +620,7 @@ class CredentialResponse(BaseModel):
     location: Optional[str] = None
     credentials_path: Optional[str] = None
     has_api_key: bool = False
+    has_auth_token: bool = False
     created: str
     updated: str
     model_count: int = 0

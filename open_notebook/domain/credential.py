@@ -37,6 +37,7 @@ class Credential(ObjectModel):
     table_name: ClassVar[str] = "credential"
     nullable_fields: ClassVar[set[str]] = {
         "api_key",
+        "auth_token",
         "base_url",
         "endpoint",
         "api_version",
@@ -53,6 +54,7 @@ class Credential(ObjectModel):
     provider: str
     modalities: List[str] = []
     api_key: Optional[SecretStr] = None
+    auth_token: Optional[SecretStr] = None
     base_url: Optional[str] = None
     endpoint: Optional[str] = None
     api_version: Optional[str] = None
@@ -74,6 +76,8 @@ class Credential(ObjectModel):
         config: Dict[str, Any] = {}
         if self.api_key:
             config["api_key"] = self.api_key.get_secret_value()
+        if self.auth_token:
+            config["auth_token"] = self.auth_token.get_secret_value()
         if self.base_url:
             config["base_url"] = self.base_url
         if self.endpoint:
@@ -114,33 +118,37 @@ class Credential(ObjectModel):
 
     @classmethod
     async def get(cls, id: str) -> "Credential":
-        """Override get() to handle api_key decryption."""
+        """Override get() to handle api_key and auth_token decryption."""
         instance = await super().get(id)
         # Pydantic auto-wraps the raw DB string in SecretStr, so we need
         # to extract, decrypt, and re-wrap regardless of type.
-        if instance.api_key:
-            raw = (
-                instance.api_key.get_secret_value()
-                if isinstance(instance.api_key, SecretStr)
-                else instance.api_key
-            )
-            decrypted = decrypt_value(raw)
-            object.__setattr__(instance, "api_key", SecretStr(decrypted))
+        for field_name in ("api_key", "auth_token"):
+            field_val = getattr(instance, field_name, None)
+            if field_val:
+                raw = (
+                    field_val.get_secret_value()
+                    if isinstance(field_val, SecretStr)
+                    else field_val
+                )
+                decrypted = decrypt_value(raw)
+                object.__setattr__(instance, field_name, SecretStr(decrypted))
         return instance
 
     @classmethod
     async def get_all(cls, order_by=None) -> List["Credential"]:
-        """Override get_all() to handle api_key decryption."""
+        """Override get_all() to handle api_key and auth_token decryption."""
         instances = await super().get_all(order_by=order_by)
         for instance in instances:
-            if instance.api_key:
-                raw = (
-                    instance.api_key.get_secret_value()
-                    if isinstance(instance.api_key, SecretStr)
-                    else instance.api_key
-                )
-                decrypted = decrypt_value(raw)
-                object.__setattr__(instance, "api_key", SecretStr(decrypted))
+            for field_name in ("api_key", "auth_token"):
+                field_val = getattr(instance, field_name, None)
+                if field_val:
+                    raw = (
+                        field_val.get_secret_value()
+                        if isinstance(field_val, SecretStr)
+                        else field_val
+                    )
+                    decrypted = decrypt_value(raw)
+                    object.__setattr__(instance, field_name, SecretStr(decrypted))
         return instances
 
     async def get_linked_models(self) -> list:
@@ -156,44 +164,50 @@ class Credential(ObjectModel):
         return [Model(**row) for row in results]
 
     def _prepare_save_data(self) -> Dict[str, Any]:
-        """Override to encrypt api_key before storage."""
+        """Override to encrypt api_key and auth_token before storage."""
         data = {}
+        secret_fields = {"api_key", "auth_token"}
         for key, value in self.model_dump().items():
-            if key == "api_key":
+            if key in secret_fields:
                 # Handle SecretStr: extract, encrypt, store
-                if self.api_key:
-                    secret_value = self.api_key.get_secret_value()
-                    data["api_key"] = encrypt_value(secret_value)
+                field_val = getattr(self, key, None)
+                if field_val:
+                    secret_value = field_val.get_secret_value()
+                    data[key] = encrypt_value(secret_value)
                 else:
-                    data["api_key"] = None
+                    data[key] = None
             elif value is not None or key in self.__class__.nullable_fields:
                 data[key] = value
 
         return data
 
     async def save(self) -> None:
-        """Save credential, handling api_key re-hydration after DB round-trip."""
-        # Remember the original SecretStr before save
+        """Save credential, handling api_key/auth_token re-hydration after DB round-trip."""
+        # Remember the original SecretStr values before save
         original_api_key = self.api_key
+        original_auth_token = self.auth_token
 
         await super().save()
 
-        # After save, the api_key field may be set to the encrypted string
-        # from the DB result. Restore the original SecretStr.
-        if original_api_key:
-            object.__setattr__(self, "api_key", original_api_key)
-        elif self.api_key and isinstance(self.api_key, str):
-            # Decrypt if DB returned an encrypted string
-            decrypted = decrypt_value(self.api_key)
-            object.__setattr__(self, "api_key", SecretStr(decrypted))
+        # After save, secret fields may be set to encrypted strings
+        # from the DB result. Restore the original SecretStr values.
+        for field_name, original in [("api_key", original_api_key), ("auth_token", original_auth_token)]:
+            if original:
+                object.__setattr__(self, field_name, original)
+            else:
+                current = getattr(self, field_name, None)
+                if current and isinstance(current, str):
+                    decrypted = decrypt_value(current)
+                    object.__setattr__(self, field_name, SecretStr(decrypted))
 
     @classmethod
     def _from_db_row(cls, row: dict) -> "Credential":
-        """Create a Credential from a database row, decrypting api_key."""
-        api_key_val = row.get("api_key")
-        if api_key_val and isinstance(api_key_val, str):
-            decrypted = decrypt_value(api_key_val)
-            row["api_key"] = SecretStr(decrypted)
-        elif api_key_val is None:
-            row["api_key"] = None
+        """Create a Credential from a database row, decrypting secret fields."""
+        for field_name in ("api_key", "auth_token"):
+            val = row.get(field_name)
+            if val and isinstance(val, str):
+                decrypted = decrypt_value(val)
+                row[field_name] = SecretStr(decrypted)
+            elif val is None:
+                row[field_name] = None
         return cls(**row)
