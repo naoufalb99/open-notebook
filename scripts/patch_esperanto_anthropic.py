@@ -142,9 +142,15 @@ def patch():
         if self._auth_token:
             import anthropic as _anthropic
 
+            # Strip /v1 suffix: Esperanto uses base_url with /v1 for direct
+            # HTTP calls, but the Anthropic SDK prepends /v1 to paths itself.
+            sdk_base_url = self.base_url
+            if sdk_base_url and sdk_base_url.rstrip("/").endswith("/v1"):
+                sdk_base_url = sdk_base_url.rstrip("/")[:-3]
+
             client_kwargs = {
                 "auth_token": self._auth_token,
-                "base_url": self.base_url,
+                "base_url": sdk_base_url,
             }
             lc_model.__dict__["_client"] = _anthropic.Anthropic(**client_kwargs)
             lc_model.__dict__["_async_client"] = _anthropic.AsyncAnthropic(
