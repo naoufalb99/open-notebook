@@ -1,0 +1,3 @@
+-- Rollback migration 15: Remove auth_token field from credential table
+
+REMOVE FIELD auth_token ON credential;

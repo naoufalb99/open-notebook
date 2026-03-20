@@ -1,0 +1,4 @@
+-- Migration 15: Add auth_token field to credential table
+-- Supports Authorization: Bearer as alternative to x-api-key for Anthropic
+
+DEFINE FIELD auth_token ON credential TYPE option<string>;
