@@ -20,7 +20,7 @@ from open_notebook.domain.credential import Credential
 # Format: (model_name, model_type)
 TEST_MODELS = {
     "openai": ("gpt-3.5-turbo", "language"),
-    "anthropic": ("claude-3-haiku-20240307", "language"),
+    "anthropic": ("claude-3-5-haiku-20241022", "language"),
     "google": ("gemini-2.0-flash", "language"),
     "groq": ("llama-3.1-8b-instant", "language"),
     "mistral": ("mistral-small-latest", "language"),
