@@ -5,6 +5,7 @@ This allows using either x-api-key or Authorization: Bearer header for Anthropic
 Run after `uv sync` to apply the patch to the installed Esperanto package.
 """
 
+import glob
 import importlib
 import os
 import re
@@ -15,6 +16,17 @@ def find_anthropic_module():
     """Find the Esperanto Anthropic provider file."""
     import esperanto.providers.llm.anthropic as mod
     return mod.__file__
+
+
+def clear_pycache(filepath):
+    """Remove stale .pyc files for the patched module."""
+    directory = os.path.dirname(filepath)
+    basename = os.path.splitext(os.path.basename(filepath))[0]
+    pycache_dir = os.path.join(directory, "__pycache__")
+    if os.path.isdir(pycache_dir):
+        for pyc in glob.glob(os.path.join(pycache_dir, f"{basename}.*.pyc")):
+            os.remove(pyc)
+            print(f"Removed stale bytecode: {pyc}")
 
 
 def patch():
@@ -145,6 +157,9 @@ def patch():
 
     with open(filepath, "w") as f:
         f.write(content)
+
+    # Clear stale bytecode so Python uses the patched .py
+    clear_pycache(filepath)
 
     print(f"Patched: {filepath}")
 
