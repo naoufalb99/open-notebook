@@ -173,7 +173,13 @@ class Credential(ObjectModel):
         """Override to encrypt api_key and auth_token before storage."""
         data = {}
         secret_fields = {"api_key", "auth_token"}
-        for key, value in self.model_dump().items():
+        dump = self.model_dump()
+        logger.info(
+            f"_prepare_save_data: model_dump keys={list(dump.keys())}, "
+            f"auth_token in dump={'auth_token' in dump}, "
+            f"auth_token attr={getattr(self, 'auth_token', 'MISSING')!r}"
+        )
+        for key, value in dump.items():
             if key in secret_fields:
                 # Handle SecretStr: extract, encrypt, store
                 field_val = getattr(self, key, None)
@@ -185,6 +191,7 @@ class Credential(ObjectModel):
             elif value is not None or key in self.__class__.nullable_fields:
                 data[key] = value
 
+        logger.info(f"_prepare_save_data: final data keys={list(data.keys())}")
         return data
 
     async def save(self) -> None:
