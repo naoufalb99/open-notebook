@@ -78,7 +78,7 @@ class Credential(ObjectModel):
             config["api_key"] = self.api_key.get_secret_value()
         if self.auth_token:
             config["auth_token"] = self.auth_token.get_secret_value()
-        logger.debug(
+        logger.info(
             f"to_esperanto_config for {self.provider}: "
             f"has_api_key={self.api_key is not None}, "
             f"has_auth_token={self.auth_token is not None}, "

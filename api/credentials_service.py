@@ -364,6 +364,9 @@ async def test_credential(credential_id: str) -> dict:
     try:
         cred = await Credential.get(credential_id)
         config = cred.to_esperanto_config()
+        logger.info(
+            f"test_credential: provider={cred.provider}, config_keys={list(config.keys())}"
+        )
 
         from open_notebook.ai.connection_tester import (
             _test_azure_connection,
