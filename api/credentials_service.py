@@ -425,10 +425,20 @@ async def test_credential(credential_id: str) -> dict:
             }
 
         if test_type == "language":
+            logger.info(f"test_credential: creating model={test_model}, provider={provider}")
             model = AIFactory.create_language(
                 model_name=test_model, provider=provider, config=config
             )
+            logger.info(
+                f"test_credential: model created, base_url={getattr(model, 'base_url', 'N/A')}, "
+                f"has_api_key={bool(getattr(model, 'api_key', None))}, "
+                f"has_auth_token={bool(getattr(model, '_auth_token', None))}"
+            )
             lc_model = model.to_langchain()
+            # Log the actual URL the SDK client will use
+            sdk_base = getattr(lc_model, '_client', None)
+            if sdk_base:
+                logger.info(f"test_credential: LangChain client base_url={sdk_base.base_url}")
             await lc_model.ainvoke("Hi")
             return {"provider": provider, "success": True, "message": "Connection successful"}
 
